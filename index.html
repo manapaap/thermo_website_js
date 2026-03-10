@@ -156,11 +156,12 @@ function departureFromZ(eos,p,T,P,Z){
 }
 
 function solveEOS(eos,Tc,Pc,omega,T,P){
+  const PPa=P*1e5;
   const params=getParams(eos,Tc,Pc*1e5,omega,T);
-  const roots=solveVolumes(eos,params,T,P);
+  const roots=solveVolumes(eos,params,T,PPa);
   roots.sort((a,b)=>a.Z-b.Z);
   const lab=roots.map((r,i)=>{
-    const dep=departureFromZ(eos,params,T,P,r.Z);
+    const dep=departureFromZ(eos,params,T,PPa,r.Z);
     const phase=roots.length===1?"vapor":i===0?"liquid":i===roots.length-1?"vapor":"third";
     return{...r,...dep,phase};
   });
