@@ -127,12 +127,24 @@ function cubicRealRoots(A,B,C,D){
 }
 
 function getParams(eos,Tc,PcPa,omega,T){
-  const Tr=T/Tc;let a,b;
-  if(eos==="vdW"){a=27/64*R*R*Tc*Tc/PcPa;b=R*Tc/(8*PcPa);}
-  else if(eos==="RK"){a=0.42748*R*R*Math.pow(Tc,2.5)/(PcPa*Math.sqrt(T));b=0.08664*R*Tc/PcPa;}
-  else if(eos==="SRK"){const fw=0.48+1.574*omega-0.176*omega*omega,al=Math.pow(1+fw*(1-Math.sqrt(Tr)),2);a=0.42748*R*R*Tc*Tc*al/PcPa;b=0.08664*R*Tc/PcPa;}
-  else{const fw=0.37464+1.54226*omega-0.26992*omega*omega,al=Math.pow(1+fw*(1-Math.sqrt(Tr)),2);a=0.45724*R*R*Tc*Tc*al/PcPa;b=0.07780*R*Tc/PcPa;}
-  return{a,b};
+  const Tr=T/Tc,sqTr=Math.sqrt(Tr);let a,b,da_dT;
+  if(eos==="vdW"){
+    a=27/64*R*R*Tc*Tc/PcPa;b=R*Tc/(8*PcPa);da_dT=0;
+  } else if(eos==="RK"){
+    a=0.42748*R*R*Math.pow(Tc,2.5)/(PcPa*Math.sqrt(T));b=0.08664*R*Tc/PcPa;
+    da_dT=-0.5*a/T;
+  } else if(eos==="SRK"){
+    const fw=0.48+1.574*omega-0.176*omega*omega;
+    const al=Math.pow(1+fw*(1-sqTr),2);
+    a=0.42748*R*R*Tc*Tc*al/PcPa;b=0.08664*R*Tc/PcPa;
+    da_dT=0.42748*R*R*Tc*Tc/PcPa*2*(1+fw*(1-sqTr))*fw*(-1/(2*Math.sqrt(T*Tc)));
+  } else {
+    const fw=0.37464+1.54226*omega-0.26992*omega*omega;
+    const al=Math.pow(1+fw*(1-sqTr),2);
+    a=0.45724*R*R*Tc*Tc*al/PcPa;b=0.07780*R*Tc/PcPa;
+    da_dT=0.45724*R*R*Tc*Tc/PcPa*2*(1+fw*(1-sqTr))*fw*(-1/(2*Math.sqrt(T*Tc)));
+  }
+  return{a,b,da_dT};
 }
 
 function solveVolumes(eos,p,T,P){
@@ -145,12 +157,20 @@ function solveVolumes(eos,p,T,P){
 }
 
 function departureFromZ(eos,p,T,P,Z){
-  const{a,b}=p,Av=a*P/(R*R*T*T),Bv=b*P/(R*T),sq2=Math.sqrt(2);
+  const{a,b,da_dT}=p,Bv=b*P/(R*T),sq2=Math.sqrt(2);
   let dH,dS;
-  if(eos==="vdW"){dH=R*T*(Z-1)-Av*R*T/Z;dS=R*Math.log(Z-Bv);}
-  else if(eos==="RK"){dH=R*T*(Z-1)-1.5*Av*R*T/Bv*Math.log(1+Bv/Z);dS=R*Math.log(Z-Bv)-Av*R/Bv*Math.log(1+Bv/Z);}
-  else if(eos==="SRK"){dH=R*T*(Z-1)-Av*R*T/Bv*Math.log(1+Bv/Z);dS=R*Math.log(Z-Bv)-Av*R/Bv*Math.log(1+Bv/Z);}
-  else{const lt=Math.log((Z+(1+sq2)*Bv)/(Z+(1-sq2)*Bv));dH=R*T*(Z-1)-Av*R*T/(2*sq2*Bv)*lt;dS=R*Math.log(Z-Bv)-Av*R/(2*sq2*Bv)*lt;}
+  if(eos==="vdW"){
+    // vdW: da/dT=0, departure via residual: dH=RT(Z-1)-a/V, dS=R*ln(Z-B)
+    dH=R*T*(Z-1)-a*P/(R*T*Z);dS=R*Math.log(Z-Bv);
+  } else if(eos==="RK"||eos==="SRK"){
+    const lt=Math.log(1+Bv/Z);
+    dH=R*T*(Z-1)+(T*da_dT-a)/b*lt;
+    dS=R*Math.log(Z-Bv)+da_dT/b*lt;
+  } else {
+    const lt=Math.log((Z+(1+sq2)*Bv)/(Z+(1-sq2)*Bv));
+    dH=R*T*(Z-1)+(T*da_dT-a)/(b*2*sq2)*lt;
+    dS=R*Math.log(Z-Bv)+da_dT/(b*2*sq2)*lt;
+  }
   const dU=dH-R*T*(Z-1),dG=dH-T*dS,phi=Math.exp(dG/(R*T));
   return{dH,dU,dS,dG,phi};
 }
